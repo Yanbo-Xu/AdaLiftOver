@@ -46,7 +46,7 @@ adaptive_liftover <- function(gr,
                               window = 2000L,
                               option = 'adaptive',
                               gap = 5L,
-                              step_size = 200L,
+                              step_size = 100L,
                               verbose = TRUE) {
     if (verbose) {
         message('Computing orthologous regions.')
@@ -126,7 +126,7 @@ adaptive_liftover_syntenic <- function(gr,
 ## With these anchor points, we then resize the regions with widths equal to gr_query.
 generate_candidate_regions <- function(gr_query,
                                        gr_target_list,
-                                       step_size = 200L) {
+                                       step_size = 100L) {
     stopifnot(
         class(gr_query) == 'GRanges',
         class(gr_target_list) %in% c('CompressedGRangesList', 'GrangesList'),

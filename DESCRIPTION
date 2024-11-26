@@ -1,6 +1,6 @@
-Package: AdaLiftOver
+Package: AdaLiftOver_test
 Title: Adaptive liftOver
-Version: 1.0.0
+Version: 1.0.1
 Authors@R: 
     person("Chenyang", "Dong", , "cdong@stat.wisc.edu", role = c("aut", "cre"))
 Description: AdaLiftOver is a large scale computational tool for adaptively identifying orthologous regions across different species using the UCSC liftOver framework. 

@@ -10,7 +10,7 @@ adaptive_liftover(
   window = 2000L,
   option = "adaptive",
   gap = 5L,
-  step_size = 200L,
+  step_size = 100L,
   verbose = TRUE
 )
 }

@@ -145,3 +145,12 @@ browseVignettes("AdaLiftOver")
 ### Reference
 
 **C. Dong**, and **S. Keles**, "AdaLiftOver: High-resolution identification of orthologous regulatory elements with adaptive liftOver".
+
+# Yanbo Xu editing
+1. 增加了`prepare_motif_list`这个函数，目的是把chrombpnet/tf-modisco输出的PFM.meme文件转换成可以被用来计算grammar similarity的motif list。同时还把hit calling的结果转换为GRanges格式，以便后续验证scanning。   
+示例操作：
+```
+motif_preparation <- prepare_motif_list("path/to/your/PFM.meme", "path/to/your/hits.tsv")
+motif_list <- motif_preparation$motif_list
+hits_data <- motif_preparation$hits_data
+```

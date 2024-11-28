@@ -1,6 +1,6 @@
-Package: AdaLiftOver_test
+Package: AdaLiftOver.test
 Title: Adaptive liftOver
-Version: 1.0.1
+Version: 1.0.2
 Authors@R: 
     person("Chenyang", "Dong", , "cdong@stat.wisc.edu", role = c("aut", "cre"))
 Description: AdaLiftOver is a large scale computational tool for adaptively identifying orthologous regions across different species using the UCSC liftOver framework. 
@@ -10,7 +10,7 @@ License: GPL-2
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.3
 Imports:
     data.table,
     GenomicRanges,
@@ -18,7 +18,8 @@ Imports:
     rtracklayer,
     Matrix,
     PRROC,
-    GenomicAlignments
+    GenomicAlignments,
+    TFBSTools
 Suggests:
     knitr,
     rmarkdown,

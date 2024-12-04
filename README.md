@@ -147,7 +147,7 @@ browseVignettes("AdaLiftOver")
 **C. Dong**, and **S. Keles**, "AdaLiftOver: High-resolution identification of orthologous regulatory elements with adaptive liftOver".
 
 # Yanbo Xu editing
-1. 修改了`compute_similarity_grammar`这个函数。现在可以实现使用finemo hit calling的结果替换掉原本的方法motifmatchr，生成的结果仍然是：Boolean Matrix，行为region，列为motif。   
+1. 修改了`compute_similarity_grammar`这个函数。现在可以实现使用finemo/hit calling的结果替换掉原本的方法motifmatchr，生成的结果仍然是：Boolean Matrix，行为region，列为motif。   
 2. 添加了`generate_hits_query_gr_list`和`generate_hits_target_gr_list`这两个函数。用以将finemo/hit calling的结果转化成用来比对motif的格式。  
 
 workflow示例操作：

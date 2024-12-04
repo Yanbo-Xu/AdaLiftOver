@@ -147,10 +147,66 @@ browseVignettes("AdaLiftOver")
 **C. Dong**, and **S. Keles**, "AdaLiftOver: High-resolution identification of orthologous regulatory elements with adaptive liftOver".
 
 # Yanbo Xu editing
-1. 增加了`prepare_motif_list`这个函数，目的是把chrombpnet/tf-modisco输出的PFM.meme文件转换成可以被用来计算grammar similarity的motif list。同时还把hit calling的结果转换为GRanges格式，以便后续验证scanning。   
-示例操作：
+1. 修改了`compute_similarity_grammar`这个函数。现在可以实现使用finemo hit calling的结果替换掉原本的方法motifmatchr，生成的结果仍然是：Boolean Matrix，行为region，列为motif。   
+2. 添加了`generate_hits_query_gr_list`和`generate_hits_target_gr_list`这两个函数。用以将finemo/hit calling的结果转化成用来比对motif的格式。  
+
+workflow示例操作：
 ```
-motif_preparation <- prepare_motif_list("path/to/your/PFM.meme", "path/to/your/hits.tsv")
-motif_list <- motif_preparation$motif_list
-hits_data <- motif_preparation$hits_data
+# load query region
+NCC_bed <- "/home/xuyanbo/adaliftover/raw_data/Neural_crest.bed"
+gr <- import(NCC_bed, format = "BED")
+
+# load the ENCODE repertoire
+data("epigenome_mm10")
+data("epigenome_hg38")
+
+# load the UCSC chain file
+chain <- rtracklayer::import.chain("/home/xuyanbo/adaliftover/reference/mm10.hg38.rbest.chain")
+
+# map query regions
+gr_list <- adaptive_liftover(gr, chain)
+
+# compute epigenome signal similarity
+gr_list <- compute_similarity_epigenome(gr, gr_list, epigenome_mm10, epigenome_hg38)
+
+# prepare query hit calling results
+hits_query <- fread("/home/xuyanbo/adaliftover/raw_data/mouse_hits_onlypos.tsv")
+hits_query_gr_list <- generate_hits_query_gr_list(hits_query, gr)
+
+# prepare target hit calling results
+hits_target <- fread("/home/xuyanbo/adaliftover/raw_data/human_hits_onlypos.tsv")
+hits_traget_gr_list <- generate_hits_taregt_gr_list(hits_target, gr, gr_list)
+
+# compute sequence grammar similarity
+motif_mapping <- fread("/home/xuyanbo/adaliftover/output/test/mouse_human_pattern_mapping.tsv", header = TRUE)
+all_motifs <- readLines("/home/xuyanbo/adaliftover/raw_data/all_human_motifs.txt")
+gr_list <- compute_similarity_grammar(gr, gr_list, hits_query_gr_list, hits_target_gr_list, motif_mapping, all_motifs)
+
+# filter target candidate regions
+gr_list_filter <- gr_candidate_filter(
+  gr_list,
+  best_k = 1L,
+  threshold = 0.5
+)
+
+# export all region
+combined_gr <- unlist(gr_target_list_with_similarity, use.names = FALSE)
+expanded_names <- rep(mcols(gr)$name, elementNROWS(gr_list))
+mcols(combined_gr)$name <- expanded_names
+mcols(combined_gr)
+export(combined_gr, "/home/xuyanbo/adaliftover/output/test/modify/all_peaks.bed", format = "BED")
+df <- as.data.frame(combined_gr)
+write.table(df, "/home/xuyanbo/adaliftover/output/test/modify/all_peaks_score.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# export filter region
+merged_gr <- unlist(gr_list_filter)
+export(merged_gr, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks.bed", format = "BED")
+df <- as.data.frame(merged_gr)
+write.table(df, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# export filter region without "grammar_score=0"
+filtered_gr <- merged_gr[mcols(merged_gr)$grammar != 0]
+export(filtered_gr, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks_no0.bed", format = "BED")
+filtered_df <- as.data.frame(filtered_gr)
+write.table(filtered_df, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks_no0.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
 ```

@@ -2,59 +2,45 @@
 % Please edit documentation in R/compute_similarity_grammar.R
 \name{compute_similarity_grammar}
 \alias{compute_similarity_grammar}
-\title{compute_similarity_grammar}
+\title{Compute Similarity Grammar}
 \usage{
 compute_similarity_grammar(
   gr_query,
   gr_target_list,
-  query_genome,
-  target_genome,
-  motif_list,
+  hits_query_gr_list,
+  hits_target_gr_list,
+  motif_mapping,
+  all_motifs,
   grammar_size = 500L,
   metric = "cosine",
   verbose = TRUE
 )
 }
 \arguments{
-\item{gr_query}{The query genomic regions of \code{\link[GenomicRanges]{GRanges}} class.}
+\item{gr_query}{GRanges object representing the query regions.}
 
-\item{gr_target_list}{The corresponding candidate target regions of \code{\link[GenomicRanges]{GRangesList}} class.
-The length of gr_target_list should be the same as the length of gr_query}
+\item{gr_target_list}{GRangesList object representing the target regions for each query region.}
 
-\item{query_genome}{The query genome build identifier (e.g. 'mm10', 'hg38').
-Make sure the corresponding BSgenome package is installed.
-Or a \code{\link[BSgenome]{BSgenome}} class.}
+\item{hits_query_gr_list}{GRangesList object of motif hits for the query regions.}
 
-\item{target_genome}{The target genome build identifier (e.g. 'mm10', 'hg38').
-Make sure the corresponding BSgenome package is installed.
-Or a \code{\link[BSgenome]{BSgenome}} class.}
+\item{hits_target_gr_list}{GRangesList object of motif hits for the target regions.}
 
-\item{motif_list}{\code{\link[TFBSTools]{PWMatrixList}}, or \code{\link[TFBSTools]{PFMatrixList}}.}
+\item{motif_mapping}{Data frame containing the mapping between motifs in different species.
+Should have two columns: 'mouse' and 'human'.}
 
-\item{grammar_size}{The nearby region (bp) to extract regulatory grammars. Default is 500L.}
+\item{all_motifs}{Character vector of all motif names (human motifs).}
 
-\item{metric}{The metric for computing similarities between indicators.
-One of 'cosine' and 'jaccard'. Default is 'cosine'.}
+\item{grammar_size}{Integer, the size of the region to consider around each region.}
 
-\item{verbose}{Print messages or not. Default is TRUE.}
+\item{metric}{Character, the similarity metric to use ('cosine' or 'jaccard').}
+
+\item{verbose}{Logical, whether to print messages.}
 }
 \value{
-A \code{\link[GenomicRanges]{GRangesList}} class the same structure as gr_target_list
-with an extra meta column named "grammar" measuring the similarity score of sequence grammars.
+GRangesList object with the same structure as gr_target_list, with an added
+metadata column 'grammar' containing the similarity scores.
 }
 \description{
 This function computes the sequence grammar similarities between query regions and
 the corresponding list of target regions.
-}
-\examples{
-
-
-data('data_example')
-data('jaspar_pfm_list')
-gr_target_list <- compute_similarity_grammar(gr, gr_list, 'mm10', 'hg38', jaspar_pfm_list)
-
-
-}
-\author{
-Chenyang Dong \email{cdong@stat.wisc.edu}
 }

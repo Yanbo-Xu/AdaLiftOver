@@ -2,54 +2,41 @@
 % Please edit documentation in R/compute_similarity_grammar.R
 \name{compute_similarity_grammar_flat}
 \alias{compute_similarity_grammar_flat}
-\title{compute_similarity_grammar_flat}
+\title{Compute Similarity Grammar Flat}
 \usage{
 compute_similarity_grammar_flat(
   gr_query,
   gr_target,
-  query_genome,
-  target_genome,
-  motif_list,
+  hits_query_gr,
+  hits_target_gr,
+  motif_mapping,
+  all_motifs,
   grammar_size = 500L,
   metric = "cosine"
 )
 }
 \arguments{
-\item{gr_query}{The query genomic regions of \code{\link[GenomicRanges]{GRanges}} class.}
+\item{gr_query}{GRanges object representing the query regions.}
 
-\item{gr_target}{The target genomic regions of \code{\link[GenomicRanges]{GRanges}} class.
-The length of gr_target should be the same as the length of gr_query}
+\item{gr_target}{GRanges object representing the target regions.}
 
-\item{query_genome}{The query genome build identifier (e.g. 'mm10', 'hg38').
-Make sure the corresponding BSgenome package is installed.
-Or a \code{\link[BSgenome]{BSgenome}} class.}
+\item{hits_query_gr}{GRanges object of motif hits for the query regions.}
 
-\item{target_genome}{The target genome build identifier (e.g. 'mm10', 'hg38').
-Make sure the corresponding BSgenome package is installed.
-Or a \code{\link[BSgenome]{BSgenome}} class.}
+\item{hits_target_gr}{GRanges object of motif hits for the target regions.}
 
-\item{motif_list}{\code{\link[TFBSTools]{PWMatrixList}}, or \code{\link[TFBSTools]{PFMatrixList}}.}
+\item{motif_mapping}{Data frame containing the mapping between motifs in different species.
+Should have two columns: 'mouse' and 'human'.}
 
-\item{grammar_size}{The nearby region (bp) to extract regulatory grammars. Default is 500L.}
+\item{all_motifs}{Character vector of all motif names (human motifs).}
 
-\item{metric}{The metric for computing similarities between indicators.
-One of 'cosine' and 'jaccard'. Default is 'cosine'.}
+\item{grammar_size}{Integer, the size of the region to consider around each region.}
+
+\item{metric}{Character, the similarity metric to use ('cosine' or 'jaccard').}
 }
 \value{
-A numeric vector with values between 0 and 1.
+Numeric vector of similarity scores.
 }
 \description{
 This function computes the sequence grammar similarities between query regions and
 the corresponding target regions.
-}
-\examples{
-
-data('data_example')
-data('jaspar_pfm_list')
-similarity <- compute_similarity_grammar_flat(gr[2], gr_list[[2]], 'mm10', 'hg38', jaspar_pfm_list)
-
-
-}
-\author{
-Chenyang Dong \email{cdong@stat.wisc.edu}
 }

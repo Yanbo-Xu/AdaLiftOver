@@ -2,55 +2,33 @@
 % Please edit documentation in R/gr_candidate_filter.R
 \name{gr_candidate_filter}
 \alias{gr_candidate_filter}
-\title{gr_candidate_filter}
+\title{Filter Top Candidate Regions}
 \usage{
 gr_candidate_filter(
   gr_candidate,
   best_k = 1L,
-  b_intercept = -4.1626668,
-  b_epigenome = 5.4030573,
-  b_grammar = 2.0649039,
-  b_interaction = NULL,
-  threshold = 0,
+  top_percentile = 0.01,
   random = FALSE,
   verbose = TRUE
 )
 }
 \arguments{
-\item{gr_candidate}{A \code{\link[GenomicRanges]{GRangesList}} object with 'epigenome' and 'grammar' meta columns.}
+\item{gr_candidate}{A \code{\link[GenomicRanges]{GRangesList}} object with a 'grammar' meta column.}
 
-\item{best_k}{Select the best k regions for each element of gr_candidate. Default is 1L.}
+\item{best_k}{Integer, the number of top regions to select for each query region. Default is 1.}
 
-\item{b_intercept}{The regression coefficient of intercept. Default is -4.1626668.}
+\item{top_percentile}{Numeric, selects regions with grammar scores in the top percentile
+(value between 0 and 1). Default is 0.01 (top 1\%).}
 
-\item{b_epigenome}{The regression coefficient of epigenome similarity. Default is 5.4030573.}
+\item{random}{Logical, if TRUE, selects \code{best_k} regions randomly; otherwise, selects
+the highest-scoring regions. Default is FALSE.}
 
-\item{b_grammar}{The regression coefficient of grammar similarity. Default is 2.0649039.}
-
-\item{b_interaction}{The regression coefficient of the interaction term. Default is NULL.}
-
-\item{threshold}{Discard the genomic regions with score below this threshold. Default is 0.}
-
-\item{random}{Pick best_k regions randomly for each element of gr_candidate. Default is FALSE.}
-
-\item{verbose}{Print messages or not. Default is TRUE.}
+\item{verbose}{Logical, whether to print messages. Default is TRUE.}
 }
 \value{
-A \code{\link[GenomicRanges]{GRangesList}} class the same structure as gr_candidate
-with an extra meta column named "score" measuring the overall similarity score.
-Any genomic regions with score below the threshold will be filtered away.
+A \code{\link[GenomicRanges]{GRangesList}} object with filtered regions.
 }
 \description{
-This function takes GRangesList with 'epigenome' and 'grammar' meta columns
-and filter the results based on these two columns.
-}
-\examples{
-
-data('data_example')
-gr_list_filtered <- gr_candidate_filter(gr_list_score, threshold = 0.5)
-
-
-}
-\author{
-Chenyang Dong \email{cdong@stat.wisc.edu}
+This function filters candidate target regions based on the top percentile
+of grammar similarity scores.
 }

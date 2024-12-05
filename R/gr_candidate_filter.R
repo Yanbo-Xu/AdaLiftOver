@@ -1,100 +1,68 @@
-
-
+#' Filter Top Candidate Regions
 #'
-#' gr_candidate_filter
+#' This function filters candidate target regions based on the top percentile
+#' of grammar similarity scores.
 #'
-#' This function takes GRangesList with 'epigenome' and 'grammar' meta columns
-#' and filter the results based on these two columns.
+#' @param gr_candidate A \code{\link[GenomicRanges]{GRangesList}} object with a 'grammar' meta column.
+#' @param best_k Integer, the number of top regions to select for each query region. Default is 1.
+#' @param top_percentile Numeric, selects regions with grammar scores in the top percentile 
+#'        (value between 0 and 1). Default is 0.01 (top 1%).
+#' @param random Logical, if TRUE, selects \code{best_k} regions randomly; otherwise, selects
+#'        the highest-scoring regions. Default is FALSE.
+#' @param verbose Logical, whether to print messages. Default is TRUE.
 #'
-#' @param gr_candidate
-#' A \code{\link[GenomicRanges]{GRangesList}} object with 'epigenome' and 'grammar' meta columns.
-#' @param best_k
-#' Select the best k regions for each element of gr_candidate. Default is 1L.
-#' @param b_intercept
-#' The regression coefficient of intercept. Default is -4.1626668.
-#' @param b_epigenome
-#' The regression coefficient of epigenome similarity. Default is 5.4030573.
-#' @param b_grammar
-#' The regression coefficient of grammar similarity. Default is 2.0649039.
-#' @param b_interaction
-#' The regression coefficient of the interaction term. Default is NULL.
-#' @param threshold
-#' Discard the genomic regions with score below this threshold. Default is 0.
-#' @param random
-#' Pick best_k regions randomly for each element of gr_candidate. Default is FALSE.
-#' @param verbose
-#' Print messages or not. Default is TRUE.
-#'
-#' @return
-#' A \code{\link[GenomicRanges]{GRangesList}} class the same structure as gr_candidate
-#' with an extra meta column named "score" measuring the overall similarity score.
-#' Any genomic regions with score below the threshold will be filtered away.
-#'
-#'
-#' @examples
-#'
-#' data('data_example')
-#' gr_list_filtered <- gr_candidate_filter(gr_list_score, threshold = 0.5)
-#'
-#'
-#' @author Chenyang Dong \email{cdong@stat.wisc.edu}
-#' @import GenomicRanges
-#' @rawNamespace import(data.table, except = shift)
+#' @return A \code{\link[GenomicRanges]{GRangesList}} object with filtered regions.
 #' @export
 gr_candidate_filter <- function(gr_candidate,
                                 best_k = 1L,
-                                b_intercept = -4.1626668,
-                                b_epigenome = 5.4030573,
-                                b_grammar = 2.0649039,
-                                b_interaction = NULL,
-                                threshold = 0,
+                                top_percentile = 0.01,
                                 random = FALSE,
                                 verbose = TRUE) {
-    stopifnot(class(gr_candidate) %in% c('CompressedGRangesList', 'GrangesList'),
-              best_k >= 1)
-    best_k <- as.integer(best_k)
-
-    gr_candidate_dt <- as.data.table(gr_candidate)
-    gr_candidate_dt$`group_name` <- NULL
-
-    stopifnot(
-        'epigenome' %in% colnames(gr_candidate_dt),
-        'grammar' %in% colnames(gr_candidate_dt)
-    )
-
-    if (verbose) {
-        message('Filtering syntenic regions based on epigenome and grammar similarities.')
-    }
-
-    gr_candidate_dt[is.na(gr_candidate_dt)] <- 0
-    score <-
-        b_intercept + b_epigenome * gr_candidate_dt$epigenome + b_grammar * gr_candidate_dt$grammar
-
-    if (!is.null(b_interaction)) {
-        score <-
-            score + b_interaction * gr_candidate_dt$epigenome * gr_candidate_dt$grammar
-    }
-
-    gr_candidate_dt[, score := 1 / (1 + exp(-score))]
-    gr_candidate_dt <- gr_candidate_dt[score >= threshold]
-
-    if (random) {
-        gr_candidate_dt <-
-            gr_candidate_dt[, .SD[sample(1:nrow(.SD), min(nrow(.SD), best_k))], by = group]
-    }
-    else {
-        gr_candidate_dt <-
-            gr_candidate_dt[, .SD[order(-score)][1:min(nrow(.SD), best_k)], by = group]
-    }
-
-    gr_candidate_dt$group <-
-        factor(gr_candidate_dt$group, levels = 1:length(gr_candidate))
-
-    gr_candidate <- makeGRangesListFromDataFrame(gr_candidate_dt,
-                                                 split.field = 'group',
-                                                 keep.extra.columns = TRUE)
-
-    names(gr_candidate) <- NULL
-
-    return(gr_candidate)
+  stopifnot(class(gr_candidate) %in% c('CompressedGRangesList', 'GRangesList'),
+            best_k >= 1,
+            top_percentile > 0 && top_percentile <= 1)
+  
+  best_k <- as.integer(best_k)
+  
+  # Convert to data.table for processing
+  gr_candidate_dt <- as.data.table(gr_candidate)
+  gr_candidate_dt$`group_name` <- NULL
+  
+  stopifnot('grammar' %in% colnames(gr_candidate_dt))
+  
+  if (verbose) {
+    message('Filtering regions based on top percentile grammar similarity.')
+  }
+  
+  # Replace NA with 0 for grammar scores
+  gr_candidate_dt[is.na(gr_candidate_dt)] <- 0
+  
+  # Calculate dynamic threshold based on top_percentile
+  threshold <- quantile(gr_candidate_dt$grammar, probs = 1 - top_percentile, na.rm = TRUE)
+  
+  if (verbose) {
+    message(sprintf("Using grammar similarity threshold: %.4f (Top %.0f%%)", threshold, top_percentile * 100))
+  }
+  
+  # Filter regions by grammar score
+  gr_candidate_dt <- gr_candidate_dt[grammar >= threshold]
+  
+  # Select best_k regions (randomly or by score)
+  if (random) {
+    gr_candidate_dt <- gr_candidate_dt[, .SD[sample(1:nrow(.SD), min(nrow(.SD), best_k))], by = group]
+  } else {
+    gr_candidate_dt <- gr_candidate_dt[, .SD[order(-grammar)][1:min(nrow(.SD), best_k)], by = group]
+  }
+  
+  # Retain group structure
+  gr_candidate_dt$group <- factor(gr_candidate_dt$group, levels = 1:length(gr_candidate))
+  
+  # Convert back to GRangesList
+  gr_candidate <- makeGRangesListFromDataFrame(gr_candidate_dt,
+                                               split.field = 'group',
+                                               keep.extra.columns = TRUE)
+  
+  names(gr_candidate) <- NULL
+  
+  return(gr_candidate)
 }

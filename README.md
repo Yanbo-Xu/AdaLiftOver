@@ -149,6 +149,7 @@ browseVignettes("AdaLiftOver")
 # Yanbo Xu editing
 1. 修改了`compute_similarity_grammar`这个函数。现在可以实现使用finemo hit calling的结果替换掉原本的方法motifmatchr，生成的结果仍然是：Boolean Matrix，行为region，列为motif。   
 2. 添加了`generate_hits_query_gr_list`和`generate_hits_target_gr_list`这两个函数。用以将finemo/hit calling的结果转化成用来比对motif的格式。  
+3. 修改了`gr_candidate_filter`这个函数。现在不考虑epigenome similarity，只根据grammar similarity来进行计算。threshold被换为top_percentile，使用前1%作为阈值（先前的阈值被固定为0.5）。
 
 workflow示例操作：
 ```
@@ -156,18 +157,11 @@ workflow示例操作：
 NCC_bed <- "/home/xuyanbo/adaliftover/raw_data/Neural_crest.bed"
 gr <- import(NCC_bed, format = "BED")
 
-# load the ENCODE repertoire
-data("epigenome_mm10")
-data("epigenome_hg38")
-
 # load the UCSC chain file
 chain <- rtracklayer::import.chain("/home/xuyanbo/adaliftover/reference/mm10.hg38.rbest.chain")
 
 # map query regions
 gr_list <- adaptive_liftover(gr, chain)
-
-# compute epigenome signal similarity
-gr_list <- compute_similarity_epigenome(gr, gr_list, epigenome_mm10, epigenome_hg38)
 
 # prepare query hit calling results
 hits_query <- fread("/home/xuyanbo/adaliftover/raw_data/mouse_hits_onlypos.tsv")
@@ -186,7 +180,7 @@ gr_list <- compute_similarity_grammar(gr, gr_list, hits_query_gr_list, hits_targ
 gr_list_filter <- gr_candidate_filter(
   gr_list,
   best_k = 1L,
-  threshold = 0.5
+  top_percentile = 0.01
 )
 
 # export all region
@@ -203,10 +197,4 @@ merged_gr <- unlist(gr_list_filter)
 export(merged_gr, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks.bed", format = "BED")
 df <- as.data.frame(merged_gr)
 write.table(df, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
-
-# export filter region without "grammar_score=0"
-filtered_gr <- merged_gr[mcols(merged_gr)$grammar != 0]
-export(filtered_gr, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks_no0.bed", format = "BED")
-filtered_df <- as.data.frame(filtered_gr)
-write.table(filtered_df, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks_no0.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
 ```

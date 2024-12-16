@@ -152,7 +152,7 @@ browseVignettes("AdaLiftOver")
 3. 修改了`gr_candidate_filter`这个函数。现在不考虑epigenome similarity，只根据grammar similarity来进行计算。threshold被换为top_percentile，使用前1%作为阈值（先前的阈值被固定为0.5）。
 
 workflow示例操作：
-```
+```{r}
 # load query region
 NCC_bed <- "/home/xuyanbo/adaliftover/raw_data/Neural_crest.bed"
 gr <- import(NCC_bed, format = "BED")
@@ -169,7 +169,7 @@ hits_query_gr_list <- generate_hits_query_gr_list(hits_query, gr)
 
 # prepare target hit calling results
 hits_target <- fread("/home/xuyanbo/adaliftover/raw_data/human_hits_onlypos.tsv")
-hits_traget_gr_list <- generate_hits_taregt_gr_list(hits_target, gr, gr_list)
+hits_traget_gr_list <- generate_hits_target_gr_list(hits_target, gr, gr_list)
 
 # compute sequence grammar similarity
 motif_mapping <- fread("/home/xuyanbo/adaliftover/output/test/mouse_human_pattern_mapping.tsv", header = TRUE)
@@ -184,17 +184,29 @@ gr_list_filter <- gr_candidate_filter(
 )
 
 # export all region
-combined_gr <- unlist(gr_target_list_with_similarity, use.names = FALSE)
+combined_gr <- unlist(gr_list, use.names = FALSE)
 expanded_names <- rep(mcols(gr)$name, elementNROWS(gr_list))
 mcols(combined_gr)$name <- expanded_names
 mcols(combined_gr)
-export(combined_gr, "/home/xuyanbo/adaliftover/output/test/modify/all_peaks.bed", format = "BED")
+export(combined_gr, "/home/xuyanbo/adaliftover/output/test/test2_only_grammar_score_2/all_peaks.bed", format = "BED")
+mcols(combined_gr)[is.na(mcols(combined_gr)$grammar), "grammar"] <- 0
+mcols(combined_gr)[is.na(mcols(combined_gr)$order), "order"] <- 0
+mcols(combined_gr)[is.na(mcols(combined_gr)$distance), "distance"] <- 0
+mcols(combined_gr)$combined_score <- (mcols(combined_gr)$grammar * 
+                                        mcols(combined_gr)$order * 
+                                        mcols(combined_gr)$distance)^(1/3)
 df <- as.data.frame(combined_gr)
-write.table(df, "/home/xuyanbo/adaliftover/output/test/modify/all_peaks_score.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
+write.table(df, "/home/xuyanbo/adaliftover/output/test/test2_only_grammar_score_2/all_peaks_score.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
 
 # export filter region
 merged_gr <- unlist(gr_list_filter)
-export(merged_gr, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks.bed", format = "BED")
+export(merged_gr, "/home/xuyanbo/adaliftover/output/test/test2_only_grammar_score_2/modify_filter_peaks.bed", format = "BED")
 df <- as.data.frame(merged_gr)
-write.table(df, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
+write.table(df, "/home/xuyanbo/adaliftover/output/test/test2_only_grammar_score_2/modify_filter_peaks.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# export score > 0
+filtered_gr <- combined_gr[!is.na(mcols(combined_gr)$grammar) & mcols(combined_gr)$grammar != 0]
+export(filtered_gr, "/home/xuyanbo/adaliftover/output/test/test2_only_grammar_score_2/modify_filter_peaks_no0.bed", format = "BED")
+filtered_df <- as.data.frame(filtered_gr)
+write.table(filtered_df, "/home/xuyanbo/adaliftover/output/test/test2_only_grammar_score_2/modify_filter_peaks_no0.tsv", sep = "\t", row.names = FALSE, quote = FALSE)
 ```

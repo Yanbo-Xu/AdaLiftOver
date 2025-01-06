@@ -183,7 +183,7 @@ gr_list_filter <- gr_candidate_filter(
 )
 
 # export all region
-combined_gr <- unlist(gr_target_list_with_similarity, use.names = FALSE)
+combined_gr <- unlist(gr_list, use.names = FALSE)
 expanded_names <- rep(mcols(gr)$name, elementNROWS(gr_list))
 mcols(combined_gr)$name <- expanded_names
 mcols(combined_gr)

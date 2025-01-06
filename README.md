@@ -150,9 +150,8 @@ browseVignettes("AdaLiftOver")
 1. 修改了`compute_similarity_grammar`这个函数。现在可以实现使用finemo/hit calling的结果替换掉原本的方法motifmatchr，生成的结果仍然是：Boolean Matrix，行为region，列为motif。   
 2. 添加了`generate_hits_query_gr_list`和`generate_hits_target_gr_list`这两个函数。用以将finemo/hit calling的结果转化成用来比对motif的格式。  
 3. 修改了`gr_candidate_filter`这个函数。现在不考虑epigenome similarity，只根据grammar similarity来进行计算。threshold被换为top_percentile，使用前1%作为阈值（先前的阈值被固定为0.5）。
-
 workflow示例操作：
-```
+```r
 # load query region
 NCC_bed <- "/home/xuyanbo/adaliftover/raw_data/Neural_crest.bed"
 gr <- import(NCC_bed, format = "BED")
@@ -169,7 +168,7 @@ hits_query_gr_list <- generate_hits_query_gr_list(hits_query, gr)
 
 # prepare target hit calling results
 hits_target <- fread("/home/xuyanbo/adaliftover/raw_data/human_hits_onlypos.tsv")
-hits_traget_gr_list <- generate_hits_taregt_gr_list(hits_target, gr, gr_list)
+hits_target_gr_list <- generate_hits_taregt_gr_list(hits_target, gr, gr_list)
 
 # compute sequence grammar similarity
 motif_mapping <- fread("/home/xuyanbo/adaliftover/output/test/mouse_human_pattern_mapping.tsv", header = TRUE)
@@ -194,6 +193,8 @@ write.table(df, "/home/xuyanbo/adaliftover/output/test/modify/all_peaks_score.ts
 
 # export filter region
 merged_gr <- unlist(gr_list_filter)
+filtered_names <- rep(mcols(gr)$name, elementNROWS(gr_list_filter)) 
+mcols(merged_gr)$name <- filtered_names
 export(merged_gr, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks.bed", format = "BED")
 df <- as.data.frame(merged_gr)
 write.table(df, "/home/xuyanbo/adaliftover/output/test/modify_filter_peaks.tsv", sep = "\t", row.names = FALSE, quote = FALSE)

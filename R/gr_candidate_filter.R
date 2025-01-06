@@ -5,7 +5,7 @@
 #'
 #' @param gr_candidate A \code{\link[GenomicRanges]{GRangesList}} object with a 'grammar' meta column.
 #' @param best_k Integer, the number of top regions to select for each query region. Default is 1.
-#' @param top_percentile Numeric, selects regions with grammar scores in the top percentile 
+#' @param top_percentile Numeric, selects regions with grammar scores in the top percentile
 #'        (value between 0 and 1). Default is 0.01 (top 1%).
 #' @param random Logical, if TRUE, selects \code{best_k} regions randomly; otherwise, selects
 #'        the highest-scoring regions. Default is FALSE.
@@ -24,7 +24,6 @@ gr_candidate_filter <- function(gr_candidate,
   
   best_k <- as.integer(best_k)
   
-  # Convert to data.table for processing
   gr_candidate_dt <- as.data.table(gr_candidate)
   gr_candidate_dt$`group_name` <- NULL
   
@@ -37,31 +36,32 @@ gr_candidate_filter <- function(gr_candidate,
   # Replace NA with 0 for grammar scores
   gr_candidate_dt[is.na(gr_candidate_dt)] <- 0
   
-  # Calculate dynamic threshold based on top_percentile
   threshold <- quantile(gr_candidate_dt$grammar, probs = 1 - top_percentile, na.rm = TRUE)
   
   if (verbose) {
-    message(sprintf("Using grammar similarity threshold: %.4f (Top %.0f%%)", threshold, top_percentile * 100))
+    message(sprintf("Using grammar similarity threshold: %.4f (Top %.0f%%)",
+                    threshold, top_percentile * 100))
   }
   
-  # Filter regions by grammar score
   gr_candidate_dt <- gr_candidate_dt[grammar >= threshold]
   
-  # Select best_k regions (randomly or by score)
   if (random) {
-    gr_candidate_dt <- gr_candidate_dt[, .SD[sample(1:nrow(.SD), min(nrow(.SD), best_k))], by = group]
+    gr_candidate_dt <- gr_candidate_dt[
+      , .SD[sample(1:.N, min(.N, best_k))], by = group
+    ]
   } else {
-    gr_candidate_dt <- gr_candidate_dt[, .SD[order(-grammar)][1:min(nrow(.SD), best_k)], by = group]
+    gr_candidate_dt <- gr_candidate_dt[
+      , .SD[order(-grammar)][1:min(.N, best_k)], by = group
+    ]
   }
   
-  # Retain group structure
   gr_candidate_dt$group <- factor(gr_candidate_dt$group, levels = 1:length(gr_candidate))
   
-  # Convert back to GRangesList
-  gr_candidate <- makeGRangesListFromDataFrame(gr_candidate_dt,
-                                               split.field = 'group',
-                                               keep.extra.columns = TRUE)
-  
+  gr_candidate <- makeGRangesListFromDataFrame(
+    gr_candidate_dt,
+    split.field = 'group',
+    keep.extra.columns = TRUE
+  )
   names(gr_candidate) <- NULL
   
   return(gr_candidate)

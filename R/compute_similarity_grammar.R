@@ -5,11 +5,13 @@
 #'
 #' @param gr_query GRanges object representing the query regions.
 #' @param gr_target_list GRangesList object representing the target regions for each query region.
-#' @param hits_query_gr_list GRangesList object of motif hits for the query regions (mouse motifs).
-#' @param hits_target_gr_list GRangesList object of motif hits for the target regions (human motifs).
+#' @param hits_query_gr_list GRangesList object of motif hits for the query regions (in source species).
+#' @param hits_target_gr_list GRangesList object of motif hits for the target regions (in target species).
 #' @param motif_mapping Data frame containing the mapping between motifs in different species.
-#'                      Should have two columns: 'mouse' and 'human'.
-#' @param all_motifs Character vector of all motif names (human motifs).
+#'                      It must have at least two columns, named according to \code{from_species} and \code{to_species}.
+#' @param all_motifs Character vector of all motif names in the \strong{target} species.
+#' @param from_species Character(1). Column name in \code{motif_mapping} representing query (source) species motifs.
+#' @param to_species Character(1). Column name in \code{motif_mapping} representing target species motifs.
 #' @param grammar_size Integer, the size of the region to consider around each region.
 #' @param metric Character, the similarity metric to use ('cosine' or 'jaccard').
 #' @param verbose Logical, whether to print messages.
@@ -23,6 +25,8 @@ compute_similarity_grammar <- function(gr_query,
                                        hits_target_gr_list,
                                        motif_mapping,
                                        all_motifs,
+                                       from_species,
+                                       to_species,
                                        grammar_size = 500L,
                                        metric = 'cosine',
                                        verbose = TRUE) {
@@ -49,20 +53,20 @@ compute_similarity_grammar <- function(gr_query,
     gr_query_i <- gr_query[i]
     hits_query_gr_i <- hits_query_gr_list[[i]]
     
-    # Map motifs in hits_query_gr_i from mouse to human
+    # Map motifs from from_species to to_species
     if (length(hits_query_gr_i) > 0) {
       hits_query_gr_mapped <- map_motifs(
-        hits_gr = hits_query_gr_i, 
+        hits_gr = hits_query_gr_i,
         motif_mapping = motif_mapping,
-        from_species = 'mouse', 
-        to_species = 'human'
+        from_species = from_species,
+        to_species = to_species
       )
     } else {
       hits_query_gr_mapped <- GRanges()
       mcols(hits_query_gr_mapped)$motif <- character(0)
     }
     
-    gr_target_regions_i <- gr_target_list[[i]]  # GRanges for multiple target regions
+    gr_target_regions_i <- gr_target_list[[i]]     # GRanges for multiple target regions
     hits_target_gr_list_i <- hits_target_gr_list[[i]]  # GRangesList for target regions hits
     
     similarities_i <- numeric(length(gr_target_regions_i))
@@ -76,16 +80,21 @@ compute_similarity_grammar <- function(gr_query,
         mcols(hits_target_gr_j)$motif <- character(0)
       }
       
-      # Compute similarity using already mapped hits_query_gr_mapped
+      # Compute similarity using mapped query hits and target hits
       similarity_ij <- compute_similarity_grammar_flat(
         gr_query = gr_query_i,
         gr_target = gr_target_j,
-        hits_query_gr_mapped = hits_query_gr_mapped, # 传入已映射好的查询hits
+        hits_query_gr_mapped = hits_query_gr_mapped,
         hits_target_gr = hits_target_gr_j,
         all_motifs = all_motifs,
         grammar_size = grammar_size,
         metric = metric
       )
+      
+      # 防止 NULL 切断 numeric 向量
+      if (is.null(similarity_ij)) {
+        similarity_ij <- 0  # 或 NA_real_
+      }
       
       similarities_i[j] <- similarity_ij
     }
@@ -98,13 +107,12 @@ compute_similarity_grammar <- function(gr_query,
   return(result_gr_list)
 }
 
-
 #' Map Motifs Between Species
 #'
 #' @param hits_gr GRanges with 'motif' metadata column.
-#' @param motif_mapping Data frame with columns 'mouse' and 'human'.
-#' @param from_species 'mouse' or 'human'
-#' @param to_species 'mouse' or 'human'
+#' @param motif_mapping Data frame with at least two columns: \code{from_species} and \code{to_species}.
+#' @param from_species Character(1). One column name in \code{motif_mapping} representing source species motifs.
+#' @param to_species Character(1). One column name in \code{motif_mapping} representing target species motifs.
 #' @export
 map_motifs <- function(hits_gr, motif_mapping, from_species, to_species) {
   stopifnot(class(hits_gr) == 'GRanges')
@@ -113,18 +121,16 @@ map_motifs <- function(hits_gr, motif_mapping, from_species, to_species) {
     stop("The hits_gr object must contain a 'motif' metadata column.")
   }
   
-  if (!(from_species %in% c('mouse', 'human')) || !(to_species %in% c('mouse', 'human'))) {
-    stop("from_species and to_species must be either 'mouse' or 'human'.")
+  motif_mapping <- as.data.table(motif_mapping)
+  
+  # Check if from_species/to_species exist in the motif_mapping
+  if (!(from_species %in% names(motif_mapping)) || !(to_species %in% names(motif_mapping))) {
+    stop("from_species or to_species not found in 'motif_mapping' columns.")
   }
   
-  motif_mapping <- as.data.table(motif_mapping)
-  mapping_col_from <- from_species
-  mapping_col_to <- to_species
-  
-  motif_map <- setNames(motif_mapping[[mapping_col_to]], motif_mapping[[mapping_col_from]])
+  motif_map <- setNames(motif_mapping[[to_species]], motif_mapping[[from_species]])
   
   hits_gr$motif_mapped <- motif_map[hits_gr$motif]
-  
   hits_gr <- hits_gr[!is.na(hits_gr$motif_mapped)]
   hits_gr$motif <- hits_gr$motif_mapped
   hits_gr$motif_mapped <- NULL
@@ -132,12 +138,11 @@ map_motifs <- function(hits_gr, motif_mapping, from_species, to_species) {
   return(hits_gr)
 }
 
-
 #' Compute Grammar Matrix
 #'
 #' @param gr GRanges for regions
 #' @param hits_gr GRanges for hits
-#' @param all_motifs character vector of human motifs
+#' @param all_motifs character vector of motif names in the \strong{target} species
 #' @param grammar_size integer
 #' @export
 compute_grammar_matrix <- function(gr,
@@ -151,7 +156,7 @@ compute_grammar_matrix <- function(gr,
   
   grammar_size <- as.integer(grammar_size)
   
-  # First filter hits_gr by all_motifs
+  # Filter hits_gr by the known 'all_motifs' of the target species
   hits_gr <- hits_gr[hits_gr$motif %in% all_motifs]
   
   offset <- pmax(grammar_size - width(gr), 0) %/% 2
@@ -177,7 +182,6 @@ compute_grammar_matrix <- function(gr,
   return(presence_matrix)
 }
 
-
 #' Compute Similarity From Matrix Grammar
 #'
 #' @param query_mat sparse matrix
@@ -194,6 +198,7 @@ compute_similarity_from_matrix_grammar <- function(query_mat,
     metric %in% c('cosine', 'jaccard')
   )
   
+  # Align row counts if one side has only 1 row
   if (nrow(query_mat) != nrow(target_mat)) {
     if (nrow(query_mat) == 1) {
       query_mat <- query_mat[rep(1, nrow(target_mat)), , drop = FALSE]
@@ -215,7 +220,6 @@ compute_similarity_from_matrix_grammar <- function(query_mat,
   return(similarity)
 }
 
-
 #' Compute Similarity Grammar Flat
 #'
 #' This function computes the sequence grammar similarities between one query region and
@@ -223,9 +227,9 @@ compute_similarity_from_matrix_grammar <- function(query_mat,
 #'
 #' @param gr_query GRanges representing a single query region
 #' @param gr_target GRanges representing one or multiple target regions combined
-#' @param hits_query_gr_mapped GRanges of motif hits for query region, already mapped to human
+#' @param hits_query_gr_mapped GRanges of motif hits for query region, already mapped to the \strong{target} species
 #' @param hits_target_gr GRanges of motif hits for the target region
-#' @param all_motifs character vector of human motifs
+#' @param all_motifs character vector of motif names in the target species
 #' @param grammar_size integer
 #' @param metric 'cosine' or 'jaccard'
 #' @export
@@ -246,13 +250,21 @@ compute_similarity_grammar_flat <- function(gr_query,
     grammar_size >= 100
   )
   
+  # If either side is empty, we return NULL (caller must handle it)
   if (length(gr_query) == 0 || length(gr_target) == 0) {
     return(NULL)
   }
   
-  query_mat <- compute_grammar_matrix(gr_query, hits_query_gr_mapped, all_motifs, grammar_size)
-  target_mat <- compute_grammar_matrix(gr_target, hits_target_gr, all_motifs, grammar_size)
+  query_mat <- compute_grammar_matrix(
+    gr_query, hits_query_gr_mapped, all_motifs, grammar_size
+  )
+  target_mat <- compute_grammar_matrix(
+    gr_target, hits_target_gr, all_motifs, grammar_size
+  )
   
-  similarity <- compute_similarity_from_matrix_grammar(query_mat, target_mat, metric)
+  similarity <- compute_similarity_from_matrix_grammar(
+    query_mat, target_mat, metric
+  )
+  
   return(similarity)
 }

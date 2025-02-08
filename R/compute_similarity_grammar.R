@@ -102,9 +102,9 @@ compute_similarity_grammar <- function(gr_query,
 #' Map Motifs Between Species
 #'
 #' @param hits_gr GRanges with 'motif' metadata column.
-#' @param motif_mapping Data frame with columns 'mouse' and 'human'.
-#' @param from_species 'mouse' or 'human'
-#' @param to_species 'mouse' or 'human'
+#' @param motif_mapping Data frame with columns for motif mappings.
+#' @param from_species Name of the species for the query motifs (column name in motif_mapping).
+#' @param to_species Name of the species for the target motifs (column name in motif_mapping).
 #' @export
 map_motifs <- function(hits_gr, motif_mapping, from_species, to_species) {
   stopifnot(class(hits_gr) == 'GRanges')
@@ -113,18 +113,18 @@ map_motifs <- function(hits_gr, motif_mapping, from_species, to_species) {
     stop("The hits_gr object must contain a 'motif' metadata column.")
   }
   
-  if (!(from_species %in% c('mouse', 'human')) || !(to_species %in% c('mouse', 'human'))) {
-    stop("from_species and to_species must be either 'mouse' or 'human'.")
-  }
-  
   motif_mapping <- as.data.table(motif_mapping)
+  
+  # Directly use the column names without checking species names
   mapping_col_from <- from_species
   mapping_col_to <- to_species
   
+  # Map the motifs from the 'from_species' to the 'to_species'
   motif_map <- setNames(motif_mapping[[mapping_col_to]], motif_mapping[[mapping_col_from]])
   
   hits_gr$motif_mapped <- motif_map[hits_gr$motif]
   
+  # Remove unmapped motifs
   hits_gr <- hits_gr[!is.na(hits_gr$motif_mapped)]
   hits_gr$motif <- hits_gr$motif_mapped
   hits_gr$motif_mapped <- NULL

@@ -152,7 +152,7 @@ browseVignettes("AdaLiftOver")
 3. 修改了`gr_candidate_filter`这个函数。现在不考虑epigenome similarity，只根据grammar similarity来进行计算。threshold被换为top_percentile，使用前1%作为阈值（先前的阈值被固定为0.5）。
 
 workflow示例操作：
-```
+```r
 # load query region
 NCC_bed <- "/home/xuyanbo/adaliftover/raw_data/Neural_crest.bed"
 gr <- import(NCC_bed, format = "BED")
@@ -169,7 +169,7 @@ hits_query_gr_list <- generate_hits_query_gr_list(hits_query, gr)
 
 # prepare target hit calling results
 hits_target <- fread("/home/xuyanbo/adaliftover/raw_data/human_hits_onlypos.tsv")
-hits_traget_gr_list <- generate_hits_taregt_gr_list(hits_target, gr, gr_list)
+hits_target_gr_list <- generate_hits_target_gr_list(hits_target, gr, gr_list)
 
 # compute sequence grammar similarity
 motif_mapping <- fread("/home/xuyanbo/adaliftover/output/test/mouse_human_pattern_mapping.tsv", header = TRUE)

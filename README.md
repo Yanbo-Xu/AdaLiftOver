@@ -168,7 +168,7 @@ hits_query_gr_list <- generate_hits_query_gr_list(hits_query, gr)
 
 # prepare target hit calling results
 hits_target <- fread("/home/xuyanbo/adaliftover/raw_data/human_hits_onlypos.tsv")
-hits_target_gr_list <- generate_hits_taregt_gr_list(hits_target, gr, gr_list)
+hits_target_gr_list <- generate_hits_target_gr_list(hits_target, gr, gr_list)
 
 # compute sequence grammar similarity
 motif_mapping <- fread("/home/xuyanbo/adaliftover/output/test/mouse_human_pattern_mapping.tsv", header = TRUE)

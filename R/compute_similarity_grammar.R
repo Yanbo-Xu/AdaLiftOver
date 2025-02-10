@@ -1,3 +1,24 @@
+#' Update the motif group counts during the comparison of query and target regions.
+#'
+#' @param query_vec A logical vector indicating the presence of motif groups in the query region.
+#' @param target_vec A logical vector indicating the presence of motif groups in the target region.
+#' @param motif_count A vector where each element tracks the count for a specific motif group.
+update_motif_count <- function(query_vec, target_vec, motif_count) {
+  # Ensure query_vec and target_vec are logical vectors of equal length
+  if (length(query_vec) != length(target_vec)) {
+    stop("query_vec and target_vec must be of the same length")
+  }
+  
+  # For each motif group, if both query and target contain the motif, increment the count
+  for (i in seq_along(query_vec)) {
+    if (query_vec[i] && target_vec[i]) {
+      motif_count[i] <- motif_count[i] + 1  # Increment count for the motif group at index i
+    }
+  }
+  return(motif_count)
+}
+
+
 ###############################################################################
 ##                   NEW & MODIFIED CODE FOR motif GROUP LOGIC               ##
 ###############################################################################
@@ -167,42 +188,21 @@ compute_similarity_grammar <- function(gr_query,
                                        hits_query_gr_list,
                                        hits_target_gr_list,
                                        motif_mapping,
-                                       all_motifs = NULL,   # optional if needed
-                                       from_species = NULL, # no longer used
-                                       to_species   = NULL, # no longer used
                                        grammar_size = 500L,
                                        metric = 'cosine',
                                        verbose = TRUE) {
-  stopifnot(
-    class(gr_query) == 'GRanges',
-    class(gr_target_list) %in% c('GRangesList', 'CompressedGRangesList'),
-    length(gr_query) == length(gr_target_list),
-    class(hits_query_gr_list) %in% c('GRangesList', 'CompressedGRangesList'),
-    length(gr_query) == length(hits_query_gr_list),
-    length(gr_query) == length(hits_target_gr_list),
-    metric %in% c('cosine', 'jaccard')
-  )
-  
-  if (verbose) {
-    message('Computing grammar similarity scores [group-based logic].')
-  }
-  
-  # Parse motif_mapping => group_list
+  # Initialize the count matrix for tracking motif group occurrences
   group_list <- parse_motif_mapping(motif_mapping, from_col="mouse", to_col="human")
-  n_group <- length(group_list)
-  if (verbose) {
-    message("Parsed motif_mapping into ", n_group, " group(s).")
-  }
+  motif_count <- rep(0, length(group_list))
   
+  # Process each query region and compare with target regions
   result_list <- vector("list", length(gr_query))
-  
   for (i in seq_along(gr_query)) {
     if (verbose) {
       message("Processing query region: ", i, " / ", length(gr_query))
     }
     gr_query_i      <- gr_query[i]
     hits_query_gr_i <- hits_query_gr_list[[i]]
-    
     gr_target_regions_i    <- gr_target_list[[i]]  
     hits_target_gr_list_i  <- hits_target_gr_list[[i]]
     
@@ -212,29 +212,28 @@ compute_similarity_grammar <- function(gr_query,
       gr_target_j      <- gr_target_regions_i[j]
       hits_target_gr_j <- hits_target_gr_list_i[[j]]
       
-      # Use the new "flat" function that is group-based
-      similarity_ij <- compute_similarity_grammar_flat(
+      result <- compute_similarity_grammar_flat(
         gr_query_i,
         gr_target_j,
         hits_query_gr_i,
         hits_target_gr_j,
         group_list = group_list,
         grammar_size = grammar_size,
-        metric = metric
+        metric = metric,
+        motif_count = motif_count
       )
       
-      # 防止返回 NULL 的情况
-      if (is.null(similarity_ij)) {
-        similarity_ij <- 0
-      }
-      similarities_i[j] <- similarity_ij
+      similarities_i[j] <- result$similarity
+      motif_count <- result$motif_count
     }
     mcols(gr_target_regions_i)$grammar <- similarities_i
     result_list[[i]] <- gr_target_regions_i
   }
   
   result_gr_list <- GRangesList(result_list)
-  return(result_gr_list)
+  
+  # Return the original gr_list and the motif_count vector
+  return(list(gr_list = result_gr_list, motif_count = motif_count))
 }
 
 
@@ -253,18 +252,19 @@ compute_similarity_grammar <- function(gr_query,
 #' @return numeric(1) similarity score, or NULL if either region is empty
 #' @export
 compute_similarity_grammar_flat <- function(gr_query,
-                                            gr_target,
-                                            hits_query_gr,
-                                            hits_target_gr,
-                                            group_list,
-                                            grammar_size = 500L,
-                                            metric = 'cosine') {
+                                           gr_target,
+                                           hits_query_gr,
+                                           hits_target_gr,
+                                           group_list,
+                                           grammar_size = 500L,
+                                           metric = 'cosine',
+                                           motif_count) {
   stopifnot(
-    class(gr_query)  == 'GRanges',
+    class(gr_query) == 'GRanges',
     class(gr_target) == 'GRanges',
     length(gr_query) <= 1,
     length(gr_target) <= 1,
-    metric %in% c('cosine','jaccard')
+    metric %in% c('cosine', 'jaccard')
   )
   
   if (length(gr_query) == 0 || length(gr_target) == 0) {
@@ -289,7 +289,10 @@ compute_similarity_grammar_flat <- function(gr_query,
     grammar_size = grammar_size
   )
   
+  # Update the motif count based on query_vec and target_vec
+  motif_count <- update_motif_count(query_vec, target_vec, motif_count)
+  
   # Compute similarity
   sim <- similarity_one_pair_of_group_vectors(query_vec, target_vec, metric)
-  return(sim)
+  return(list(similarity = sim, motif_count = motif_count))
 }

@@ -189,10 +189,12 @@ compute_similarity_grammar <- function(gr_query,
                                        hits_target_gr_list,
                                        motif_mapping,
                                        grammar_size = 500L,
+                                       from_col = "mouse",
+                                       to_col   = "human",
                                        metric = 'cosine',
                                        verbose = TRUE) {
   # Initialize the count matrix for tracking motif group occurrences
-  group_list <- parse_motif_mapping(motif_mapping, from_col="mouse", to_col="human")
+  group_list <- parse_motif_mapping(motif_mapping, from_col=from_col, to_col=to_col)
   motif_count <- rep(0, length(group_list))
   
   # Process each query region and compare with target regions

@@ -191,51 +191,161 @@ compute_similarity_grammar <- function(gr_query,
                                        grammar_size = 500L,
                                        from_col = "mouse",
                                        to_col   = "human",
+                                       anno_from_col = "annotation_1",
+                                       anno_to_col   = "annotation_2",
                                        metric = 'cosine',
                                        verbose = TRUE) {
-  # Initialize the count matrix for tracking motif group occurrences
-  group_list <- parse_motif_mapping(motif_mapping, from_col=from_col, to_col=to_col)
-  motif_count <- rep(0, length(group_list))
+  # Step A: parse motif mapping, init group_count
+  group_list <- parse_motif_mapping(
+    motif_mapping,
+    from_col= from_col,
+    to_col= to_col,
+    anno_from_col= anno_from_col,
+    anno_to_col= anno_to_col
+  )
   
-  # Process each query region and compare with target regions
-  result_list <- vector("list", length(gr_query))
-  for (i in seq_along(gr_query)) {
-    if (verbose) {
-      message("Processing query region: ", i, " / ", length(gr_query))
-    }
+  n_groups   <- length(group_list)
+  motif_count <- integer(n_groups)
+  
+  colnames_query <- character(n_groups)
+  colnames_target <- character(n_groups)
+  for (k in seq_len(n_groups)) {
+    colnames_query[k]  <- group_list[[k]]$from_annotation
+    colnames_target[k] <- group_list[[k]]$to_annotation
+  }
+  
+  
+  # Step B: compute Query presence matrix (one row per query region)
+  n_query <- length(gr_query)
+  if (verbose) message("Building query boolean matrix, number of query regions = ", n_query)
+  
+  query_boolean_matrix <- matrix(FALSE, nrow=n_query, ncol=n_groups)
+  colnames(query_boolean_matrix) <- colnames_query
+  
+  for (i in seq_len(n_query)) {
     gr_query_i      <- gr_query[i]
     hits_query_gr_i <- hits_query_gr_list[[i]]
-    gr_target_regions_i    <- gr_target_list[[i]]  
-    hits_target_gr_list_i  <- hits_target_gr_list[[i]]
     
-    similarities_i <- numeric(length(gr_target_regions_i))
+    query_vec <- evaluate_group_presence_single_region(
+      region_gr   = gr_query_i,
+      hits_region = hits_query_gr_i,
+      group_list  = group_list,
+      side        = "from",
+      grammar_size = grammar_size
+    )
+    query_boolean_matrix[i, ] <- query_vec
+  }
+  
+  # Step C: build global target presence matrix
+  # first figure out how many total target regions there are
+  target_lengths <- sapply(gr_target_list, length)
+  n_target_total <- sum(target_lengths)
+  
+  if (verbose) message("Number of target regions in total = ", n_target_total)
+  
+  target_boolean_matrix <- matrix(FALSE, nrow=n_target_total, ncol=n_groups)
+  colnames(target_boolean_matrix) <- colnames_target
+  
+  # optional: keep a data frame that records (i, j) => row index
+  # e.g. target_info = data.frame( query_index=..., j_index=..., etc. )
+  
+  current_tindex <- 1
+  
+  # Step D: main loop - compute similarity & fill in target presence
+  # We'll store similarity in the same structure as original
+  result_list <- vector("list", n_query)
+  
+  for (i in seq_len(n_query)) {
+    if (verbose) {
+      message("Processing query region i = ", i, " / ", n_query)
+    }
+    n_target_i <- length(gr_target_list[[i]])
+    similarities_i <- numeric(n_target_i)
     
-    for (j in seq_along(gr_target_regions_i)) {
-      gr_target_j      <- gr_target_regions_i[j]
-      hits_target_gr_j <- hits_target_gr_list_i[[j]]
+    # get the query presence vector from precomputed matrix
+    query_vec <- query_boolean_matrix[i, ]
+    
+    for (j in seq_len(n_target_i)) {
+      gr_target_j      <- gr_target_list[[i]][j]
+      hits_target_gr_j <- hits_target_gr_list[[i]][[j]]
       
-      result <- compute_similarity_grammar_flat(
-        gr_query_i,
-        gr_target_j,
-        hits_query_gr_i,
-        hits_target_gr_j,
-        group_list = group_list,
-        grammar_size = grammar_size,
-        metric = metric,
-        motif_count = motif_count
+      # compute target presence vector if needed
+      target_vec <- evaluate_group_presence_single_region(
+        region_gr   = gr_target_j,
+        hits_region = hits_target_gr_j,
+        group_list  = group_list,
+        side        = "to",
+        grammar_size = grammar_size
       )
       
-      similarities_i[j] <- result$similarity
-      motif_count <- result$motif_count
+      # store in target_boolean_matrix
+      target_boolean_matrix[current_tindex, ] <- target_vec
+      
+      # compute similarity
+      sim_ij <- similarity_one_pair_of_group_vectors(query_vec, target_vec, metric)
+      similarities_i[j] <- sim_ij
+      
+      # update motif_count
+      motif_count <- update_motif_count(query_vec, target_vec, motif_count)
+      
+      current_tindex <- current_tindex + 1
     }
+    # write back similarity to GRanges
+    gr_target_regions_i <- gr_target_list[[i]]
     mcols(gr_target_regions_i)$grammar <- similarities_i
     result_list[[i]] <- gr_target_regions_i
   }
   
+  # build final gr_list
   result_gr_list <- GRangesList(result_list)
   
-  # Return the original gr_list and the motif_count vector
-  return(list(gr_list = result_gr_list, motif_count = motif_count))
+  motif_count_df <- data.frame(
+    from_annotation = sapply(group_list, function(g) g$from_annotation),
+    to_annotation   = sapply(group_list, function(g) g$to_annotation),
+    count           = motif_count
+  )
+  
+  # Step E: return everything
+  return(list(
+    gr_list               = result_gr_list,
+    motif_count           = motif_count_df,
+    query_boolean_matrix  = query_boolean_matrix,
+    target_boolean_matrix = target_boolean_matrix
+  ))
+}
+
+parse_motif_mapping <- function(motif_mapping,
+                                from_col = "from_col",
+                                to_col   = "to_col",
+                                anno_from_col = "annotation_1",
+                                anno_to_col   = "annotation_2") {
+  
+  stopifnot(from_col %in% names(motif_mapping),
+            to_col   %in% names(motif_mapping),
+            anno_from_col %in% names(motif_mapping),
+            anno_to_col   %in% names(motif_mapping))
+  
+  n <- nrow(motif_mapping)
+  group_list <- vector("list", n)
+  
+  for (i in seq_len(n)) {
+    from_str <- motif_mapping[[from_col]][i]
+    to_str   <- motif_mapping[[to_col]][i]
+    
+    # 第三、四列：注释信息
+    from_anno_str <- motif_mapping[[anno_from_col]][i]
+    to_anno_str   <- motif_mapping[[anno_to_col]][i]
+    
+    group_list[[i]] <- list(
+      # 保持原有逻辑
+      from_group = parse_motif_group_string(from_str),
+      to_group   = parse_motif_group_string(to_str),
+      # 新增注释
+      from_annotation = from_anno_str,
+      to_annotation   = to_anno_str
+    )
+  }
+  return(group_list)
 }
 
 

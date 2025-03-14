@@ -5,8 +5,9 @@
 # Yanbo Xu editing
 1. 修改了`compute_similarity_grammar.R`，输入的`motif list`需要是"pattern_a/pattern_b"或"pattern_a+pattern_b"的形式，分别表示TF family motif和cooperation motif。取消了`all_motif`的输入，将`motif list`的行数（多少个motif group）作为presence matrix的列数。
 2. 增加了对`motif group`的计数，在每一组`query region`和`target region`比较的同时计数。
+3. 增加了对每个`query region`和`target region`的TFBS的统计。添加了整列output的函数，方便直接查看。 
 
-workflow示例操作：
+pipeline：
 ```r
 library(data.table)
 library(Matrix)
@@ -46,25 +47,7 @@ mapping_result <- compute_similarity_grammar(gr, gr_list, hits_query_gr_list, hi
 gr_list <- mapping_result$gr_list
 motif_count <- mapping_result$motif_count
 
-# gr_list_filter <- gr_candidate_filter(
-#   gr_list,
-#   best_k = 1L,
-#   top_percentile = 0.05
-# )
-
-combined_gr <- unlist(gr_list, use.names = FALSE)
-expanded_names <- rep(mcols(gr)$name, elementNROWS(gr_list))
-mcols(combined_gr)$name <- expanded_names
-mcols(combined_gr)
-# export(combined_gr, "/home/xuyanbo/adaliftover/raw_data/mouse_to_P2CNCC/all_peaks.bed", format = "BED")
-df <- as.data.frame(combined_gr)
-write.table(df, paste0(outdir, "/target_region.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
-
-df_filtered <- df[df$grammar != 0, ]
-write.table(df_filtered, paste0(outdir, "/target_region_filterd.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
-
-motif_mapping$motif_count <- motif_count
-write.table(motif_mapping, paste0(outdir, "/motif_counts.tsv"), sep = "\t", row.names = FALSE, col.names = TRUE, quote = FALSE)
-
+# generate output
+generate_output(mapping_result, outdir = outdir)
 
 ```
